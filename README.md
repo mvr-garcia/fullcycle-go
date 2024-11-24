@@ -39,8 +39,8 @@ go version go1.20 darwin/amd64
 Passo 2: Clonar o Repositório
 
 ```shell
-git clone https://github.com/mvr-garcia/projeto-cotacao.git
-cd projeto-cotacao
+git clone https://github.com/mvr-garcia/fullcycle-go
+cd fullcycle-go
 ```
 
 Passo 3: Executar o Servidor
@@ -59,7 +59,7 @@ Passo 4: Executar o Cliente
 Em outro terminal, compile e execute o cliente:
 
 ```shell
-go run client.go
+go run client/main.go
 ```
 
 ### Licença
