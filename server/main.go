@@ -13,19 +13,34 @@ import (
 	_ "github.com/mattn/go-sqlite3" // Driver SQLite
 )
 
-var DB *sql.DB
+var db *sql.DB
 
 type APIResponse struct {
-	USDBRL struct {
-		Bid string `json:"bid"`
-	} `json:"USDBRL"`
+	USDBRL CurrencyData `json:"USDBRL"`
+}
+
+type CurrencyData struct {
+	Code       string `json:"code"`
+	Codein     string `json:"codein"`
+	Name       string `json:"name"`
+	High       string `json:"high"`
+	Low        string `json:"low"`
+	VarBid     string `json:"varBid"`
+	PctChange  string `json:"pctChange"`
+	Bid        string `json:"bid"`
+	Ask        string `json:"ask"`
+	Timestamp  string `json:"timestamp"`
+	CreateDate string `json:"create_date"`
 }
 
 func main() {
-	err := setupDB()
+	var err error
+
+	db, err = setupDB()
 	if err != nil {
 		panic(err)
 	}
+	defer db.Close()
 
 	http.HandleFunc("/cotacao", quoteHandler)
 	port := ":8080"
@@ -34,25 +49,24 @@ func main() {
 	log.Fatal(http.ListenAndServe(port, nil))
 }
 
-func setupDB() error {
-	DB, err := sql.Open("sqlite3", "./usd_prices.db")
+func setupDB() (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", "./usd_prices.db")
 	if err != nil {
 		log.Fatalf("Failed to connect to the database: %v", err)
-		return err
+		return db, err
 	}
-	defer DB.Close()
 
-	_, err = DB.Exec(`CREATE TABLE IF NOT EXISTS usd_prices (
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS usd_prices (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		bid TEXT NOT NULL,
 		timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`)
 	if err != nil {
 		log.Fatalf("Failed to create table: %v", err)
-		return err
+		return db, err
 	}
 
-	return err
+	return db, err
 }
 
 func quoteHandler(w http.ResponseWriter, r *http.Request) {
@@ -90,11 +104,10 @@ func quoteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Timeout para persistir no banco
 	dbCtx, cancelDB := context.WithTimeout(ctx, 10*time.Millisecond)
 	defer cancelDB()
 
-	_, err = DB.ExecContext(dbCtx, "INSERT INTO usd_prices (bid) VALUES (?)", apiResponse.USDBRL.Bid)
+	_, err = db.ExecContext(dbCtx, "INSERT INTO usd_prices (bid) VALUES (?)", apiResponse.USDBRL.Bid)
 	if err != nil {
 		http.Error(w, "Timeout persisting data", http.StatusRequestTimeout)
 		log.Printf("Database insertion timed out: %v\n", err)
@@ -102,5 +115,6 @@ func quoteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(body)
+	bidResponse := map[string]string{"bid": apiResponse.USDBRL.Bid}
+	json.NewEncoder(w).Encode(bidResponse)
 }
